@@ -1,0 +1,112 @@
+rm(list=ls())
+
+##Script for PCA with a file vcf of ipyrad
+# By Jorge Cruz Nicol?s
+# Date: May 22th, 2018
+
+# Install SNPRelate with
+#source("https://bioconductor.org/biocLite.R")
+#biocLite("SNPRelate") only first time
+
+## Load libraries
+library(gdsfmt)
+library(SNPRelate)
+library(ggplot2)
+
+#Convert VCF to GDS
+vcf.fn <- ("../data/alignment/iptest.vcf")
+
+## Reformat
+snpgdsVCF2GDS(vcf.fn, "iptest.gds", method="biallelic.only", verbose = TRUE)
+
+## Summary for imprinting information about GDS
+
+snpgdsSummary("iptest.gds")
+
+## Data analysis, open file".gds" for to be used
+
+genofile <- snpgdsOpen("iptest.gds")
+
+# Check snp.ids
+head(read.gdsn(index.gdsn(genofile, "snp.id")))
+
+# Check sample.ids
+head(read.gdsn(index.gdsn(genofile, "sample.id")))
+
+# Get samples names of gdsn
+sample.id <- read.gdsn(index.gdsn(genofile, "sample.id"))
+sample.id
+head(sample.id)
+
+#----Metadata
+
+fullmat<- read.csv("../data/Individuos.csv")
+
+# check
+head(fullmat)
+nrow(fullmat)
+
+#--Assign colors for each individual
+
+pobcol<- c( "#99CC33", "#8b008b",  "#66FFFF", "#9999FF", "#FF99FF", "#FF0000", "#696969", "#CC9900","#00ff00", "#000000",  "#9966CC", 
+     
+        "#0099CC", "#669900", "#339933",  "#c71585", "#6495ed")
+
+## Data analysis with PCA
+
+pca<-snpgdsPCA(genofile,autosome.only = FALSE, num.thread=2)
+
+## Ratio of variance
+
+pc.percent <- pca$varprop*100
+head(round(pc.percent, 2))
+
+tab <- data.frame(sample.id = pca$sample.id, EV1 = pca$eigenvect[,1],    # the first eigenvector,  
+                  EV2 = pca$eigenvect[,2],    # the second eigenvector
+                  stringsAsFactors = FALSE)
+head(tab)
+
+tab2 <- data.frame(sample.id = pca$sample.id, EV3 = pca$eigenvect[,3],    # the third eigenvector,  
+                  EV4 = pca$eigenvect[,4],    # the fourth eigenvector
+                  stringsAsFactors = FALSE)
+head(tab2)
+
+# Get information per individual
+pop_code <- as.vector(fullmat$Individuo) 
+
+# hacer pop_codes individuo coincidan con samples
+tab <- data.frame(sample.id = pca$sample.id,
+                  pop = factor(pop_code)[match(pca$sample.id, sample.id)],
+                  EV1 = pca$eigenvect[,1],    # the first eigenvector
+                  EV2 = pca$eigenvect[,2],    # the second eigenvector
+                  EV3 = pca$eigenvect[,3],    # the third eigenvector
+                  EV4 = pca$eigenvect[,4],    # the fourth eigenvector
+                  stringsAsFactors = FALSE)
+head(tab)
+
+#PLOT PCA 1 and 2
+ggplot(tab, aes(x=EV1, y=EV2))+
+  geom_point(aes(color=sample.id), size =10) + 
+  scale_color_manual(values = pobcol) +
+  theme(legend.title = element_text(size=26))+
+  theme(legend.text = element_text(size = 26))+
+  xlab(paste0("Eigenvector 1 explicando ", round(pc.percent, 2)[1], "%")) +
+  ylab(paste0("Eigenvector 2 explicando ", round(pc.percent, 2)[2], "%"))+ theme_classic() +
+  theme(axis.title.y = element_text(size = rel(3), angle = 90))+
+  theme(axis.title.x = element_text(size = rel(3), angle = 360))+
+  theme(axis.text.x = element_text(hjust = .5, size=14, color="black"))+
+  theme(axis.text.y = element_text(hjust = .5, size=14, color="black")) 
+
+#PLOT PCA 3 and 4
+ggplot(tab, aes(x=EV3, y=EV4))+
+  geom_point(aes(color=sample.id), size =10) + 
+  scale_color_manual(values = pobcol) +
+  theme(legend.title = element_text(size=26))+
+  theme(legend.text = element_text(size = 26))+
+  xlab(paste0("Eigenvector 3 explicando ", round(pc.percent, 2)[3], "%")) +
+  ylab(paste0("Eigenvector 4 explicando ", round(pc.percent, 2)[4], "%"))+ theme_classic() +
+  theme(axis.title.y = element_text(size = rel(3), angle = 90))+
+  theme(axis.title.x = element_text(size = rel(3), angle = 360))+
+  theme(axis.text.x = element_text(hjust = .5, size=14, color="black"))+
+  theme(axis.text.y = element_text(hjust = .5, size=14, color="black")) 
+
